@@ -5,10 +5,12 @@ from confluent_kafka.serialization import Serializer, Deserializer
 from faker import Faker
 from time import sleep
 from multiprocessing import Pool
-from random import randint
+from random import randint, choice
 import json
 
-TOPIC = 'input-topic'
+TOPIC = 'messages'
+SENDER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+RECEIVER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 TOPIC_PARTITIONS = 3
 
 
@@ -60,7 +62,7 @@ def produce():
     serializer = UserSerializer()
     try:
         while True:
-            msg = Message(randint(1, TOPIC_PARTITIONS), Faker().name())
+            msg = Message(choice(SENDER_IDS), choice(RECEIVER_IDS), Faker().sentence(nb_words=10))
             value = serializer(msg)
             # Отправка сообщения
             producer.produce(
