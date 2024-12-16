@@ -8,7 +8,8 @@ from multiprocessing import Pool
 from random import randint, choice
 import json
 
-TOPIC = 'messages'
+SENDER_TOPIC = 'messages'
+RECEIVER_TOPIC = 'filtered_messages'
 SENDER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 RECEIVER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 TOPIC_PARTITIONS = 3
@@ -41,16 +42,6 @@ class UserDeserializer(Deserializer):
        reciever_id = int.from_bytes(value[4 + name_size:], byteorder="big")
        return Message(sender_id, reciever_id, message)
 
-def create_topic():
-    admin = AdminClient(
-        {
-            'bootstrap.servers': "localhost:9092"
-        }
-    )
-    topic = list([NewTopic(TOPIC, TOPIC_PARTITIONS)])
-    admin.create_topics(topic)
-
-
 def produce():
     
     conf = {
@@ -66,7 +57,7 @@ def produce():
             value = serializer(msg)
             # Отправка сообщения
             producer.produce(
-                topic=TOPIC,
+                topic=SENDER_TOPIC,
                 key='id'+str(randint(1, TOPIC_PARTITIONS)),
                 value=value,
             )
@@ -91,7 +82,7 @@ def consume(poll=1):
     consumer = Consumer(conf)
 
     # Подписка на топик
-    consumer.subscribe([TOPIC])
+    consumer.subscribe([RECEIVER_TOPIC])
 
     # Чтение сообщений в бесконечном цикле
     try:
