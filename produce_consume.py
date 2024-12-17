@@ -7,6 +7,8 @@ from time import sleep
 from multiprocessing import Pool
 from random import randint, choice
 import json
+import faust
+
 
 SENDER_TOPIC = 'messages'
 RECEIVER_TOPIC = 'filtered_messages'
@@ -68,45 +70,30 @@ def produce():
     finally:
         producer.flush()
 
-def consume(poll=1):
-    conf = {
-        "bootstrap.servers": "localhost:9094",
-        "group.id": "my-group",
-        "auto.offset.reset": "earliest",
-        "enable.auto.commit": False
-    }
-    if poll:
-        conf["enable.auto.commit"] = True
-    deserializer = UserDeserializer()
-    # Создание консьюмера
-    consumer = Consumer(conf)
 
-    # Подписка на топик
-    consumer.subscribe([RECEIVER_TOPIC])
-
-    # Чтение сообщений в бесконечном цикле
-    try:
-        while True:
-            # Получение сообщений
-            msg = consumer.poll(poll)
-
-            if msg is None:
-                continue
-            if msg.error():
-                print(f"Ошибка: {msg.error()}")
-                continue
-
-            key = msg.key().decode("utf-8")
-            value = deserializer(msg.value())
-            if not poll:
-                consumer.commit(asynchronous=False)
-            print(f"Получено сообщение: key={key}, value={value.name}, offset={msg.offset()}, partition={msg.partition()}")
-    except KeyboardInterrupt:
-        print('caught ctrl+C')
-    finally:
-        # Закрытие консьюмера
-        consumer.close()
-
+def filter():
+    filtered_words = ('test', 'blue', 'grey')
+    app = faust.App(
+        "L2-message-filter",
+        broker="localhost:9094",
+        store="./data",
+        value_serializer=UserSerializer(),
+        value_deserializer=UserDeserializer()
+    )
+    table = app.Table(
+        "filter",
+        partitions=1,
+        default=lambda: Message(0, 0, "")
+    )
+    incoming_messages = app.topic(SENDER_TOPIC, value_type=Message)
+    filtered_messages = app.topic(RECEIVER_TOPIC, value_type=Message)
+    async def process(stream):  # Filtering out messages, containing filtered words
+        async for value in stream:
+            if filtered_words.intersection(value.message.split(' ')):
+                continue            
+            await filtered_messages.send(value=value)
+    app.agent(incoming_messages, stream_processing_timeout=5, handler=process)
+    app.run()
 
 if __name__ == '__main__':
     parser = ArgumentParser(usage='Simple Kafka producer/consumer')
@@ -116,10 +103,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.p:
         produce()
-    # Идея запускать одновременно два консьюмера с разными параметрами
-    elif args.c:
-        with Pool(2) as p:
-            p.map(consume(), [0.1, None])
+    elif args.c:  # Запуск Faust
+        filter()
     elif args.t:
         create_topic()
     else:
