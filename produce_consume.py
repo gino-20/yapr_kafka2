@@ -8,7 +8,8 @@ from multiprocessing import Pool
 from random import randint, choice
 import json
 import faust
-
+import keyword
+from ksqldb import KSQLdbClient
 
 SENDER_TOPIC = 'messages'
 RECEIVER_TOPIC = 'filtered_messages'
@@ -40,8 +41,8 @@ class UserDeserializer(Deserializer):
            return None
        message_size = int.from_bytes(value[:4], byteorder="big")
        message = value[4:4 + message_size].decode("utf-8")
-       sender_id = int.from_bytes(value[4 + name_size:], byteorder="big")
-       reciever_id = int.from_bytes(value[4 + name_size:], byteorder="big")
+       sender_id = int.from_bytes(value[4 + message_size:], byteorder="big")
+       reciever_id = int.from_bytes(value[4 + message_size:], byteorder="big")
        return Message(sender_id, reciever_id, message)
 
 def produce():
@@ -55,13 +56,14 @@ def produce():
     serializer = UserSerializer()
     try:
         while True:
+            # ТУДУ: не кодировать отправитедя в сообщение, а использовать его как ключ!
             msg = Message(choice(SENDER_IDS), choice(RECEIVER_IDS), Faker().sentence(nb_words=10))
             value = serializer(msg)
             # Отправка сообщения
             producer.produce(
                 topic=SENDER_TOPIC,
-                key='id'+str(randint(1, TOPIC_PARTITIONS)),
-                value=value,
+                key=bytes(str(msg.sender_id), "utf-8"),
+                value=value
             )
 #            sleep(1)
             producer.flush()
@@ -87,25 +89,47 @@ def filter():
     )
     incoming_messages = app.topic(SENDER_TOPIC, value_type=Message)
     filtered_messages = app.topic(RECEIVER_TOPIC, value_type=Message)
+
+    @app.agent(incoming_messages)
     async def process(stream):  # Filtering out messages, containing filtered words
         async for value in stream:
             if filtered_words.intersection(value.message.split(' ')):
-                continue            
+                continue
             await filtered_messages.send(value=value)
-    app.agent(incoming_messages, stream_processing_timeout=5, handler=process)
-    app.run()
+
+
+def message_consumer():
+    pass
+    # conf = {
+    #     "bootstrap.servers": "localhost:9094",
+    #     "group.id": "mygroup",
+    #     "auto.offset.reset": "earliest"
+    #     }
+    
+    # consumer = Consumer(conf)
+    # deserializer = UserDeserializer()
+    # consumer.subscribe([RECEIVER_TOPIC])
+    # try:
+    #     print('Polling mesages. Press f to filter out sender')
+    #     while True:
+    #         msg = consumer.poll(1.0)
+    #         if msg is None:
+    #             continue
+    #         if msg.error():
+    #             print(f"Consumer error: {msg.error()}")
+    #             continue
+    #         key = msg.key().decode('utf-8')
+    #         value = deserializer(msg.value())
+    #         if keyboard.is_pressed('f'):
 
 if __name__ == '__main__':
     parser = ArgumentParser(usage='Simple Kafka producer/consumer')
     parser.add_argument('-p', action='store_true', help='Produce')
     parser.add_argument('-c', action='store_true', help='Consume')
-    parser.add_argument('-t', action='store_true', help='Create topic')
     args = parser.parse_args()
     if args.p:
         produce()
-    elif args.c:  # Запуск Faust
-        filter()
-    elif args.t:
-        create_topic()
+    elif args.c:  # Consumer
+        message_consumer()
     else:
         print('Unknown action')
