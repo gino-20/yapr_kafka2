@@ -57,15 +57,15 @@ def produce():
     try:
         while True:
             # ТУДУ: не кодировать отправитедя в сообщение, а использовать его как ключ!
-            msg = Message(choice(SENDER_IDS), choice(RECEIVER_IDS), Faker().sentence(nb_words=10))
-            value = serializer(msg)
+            # msg = Message(choice(SENDER_IDS), choice(RECEIVER_IDS), Faker().sentence(nb_words=10))
+            msg = str(choice(SENDER_IDS)) + ', ' + Faker().sentence(nb_words=15)
             # Отправка сообщения
             producer.produce(
                 topic=SENDER_TOPIC,
-                key=bytes(str(msg.sender_id), "utf-8"),
-                value=value
+                key=bytes(str(choice(RECEIVER_IDS)), encoding="utf-8"),
+                value=msg
             )
-#            sleep(1)
+            sleep(5)
             producer.flush()
     except KeyboardInterrupt:
         print('Caught ctlr+C')

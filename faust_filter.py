@@ -36,7 +36,7 @@ filtered_words = {'test', 'blue', 'grey'}
 app = faust.App(
     "L2-message-filter",
     broker="localhost:9094",
-    store="./data",
+    store="//rocksdb",
     value_serializer='raw'  #  UserSerializer()
   #  value_deserializer=UserDeserializer()
 )
