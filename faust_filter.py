@@ -1,6 +1,8 @@
 import faust
 from confluent_kafka.serialization import Serializer, Deserializer
 
+from modules import init_logger
+
 
 SENDER_TOPIC = 'messages'
 RECEIVER_TOPIC = 'filtered_messages'
@@ -32,6 +34,8 @@ class UserDeserializer(Deserializer):
        reciever_id = int.from_bytes(value[4 + message_size:], byteorder="big")
        return Message(sender_id, reciever_id, message)
 
+logger = init_logger()
+
 filtered_words = {'test', 'blue', 'grey'}
 app = faust.App(
     "L2-message-filter",
@@ -55,5 +59,6 @@ async def process(stream):  # Filtering out messages, containing filtered words
             if filtered_words.intersection(value.decode("utf-8").split(', ')[1].split(' ')):
                 continue
         except ValueError as e:
+            logger.debug(e)
             continue
         await filtered_messages.send(value=value)

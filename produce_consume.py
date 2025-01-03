@@ -11,6 +11,8 @@ import faust
 import keyword
 from ksqldb import KSQLdbClient
 
+from modules import init_logger
+
 SENDER_TOPIC = 'messages'
 RECEIVER_TOPIC = 'filtered_messages'
 SENDER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -68,7 +70,7 @@ def produce():
             sleep(5)
             producer.flush()
     except KeyboardInterrupt:
-        print('Caught ctlr+C')
+        logger.debug('Caught ctlr+C')
     finally:
         producer.flush()
 
@@ -102,9 +104,10 @@ if __name__ == '__main__':
     parser.add_argument('-p', action='store_true', help='Produce')
     parser.add_argument('-c', action='store_true', help='Consume')
     args = parser.parse_args()
+    logger = init_logger()
     if args.p:
         produce()
     elif args.c:  # Consumer
         message_consumer()
     else:
-        print('Unknown action')
+        logger.debug('Unknown action')
