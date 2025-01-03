@@ -73,31 +73,6 @@ def produce():
         producer.flush()
 
 
-def filter():
-    filtered_words = ('test', 'blue', 'grey')
-    app = faust.App(
-        "L2-message-filter",
-        broker="localhost:9094",
-        store="./data",
-        value_serializer=UserSerializer(),
-        value_deserializer=UserDeserializer()
-    )
-    table = app.Table(
-        "filter",
-        partitions=1,
-        default=lambda: Message(0, 0, "")
-    )
-    incoming_messages = app.topic(SENDER_TOPIC, value_type=Message)
-    filtered_messages = app.topic(RECEIVER_TOPIC, value_type=Message)
-
-    @app.agent(incoming_messages)
-    async def process(stream):  # Filtering out messages, containing filtered words
-        async for value in stream:
-            if filtered_words.intersection(value.message.split(' ')):
-                continue
-            await filtered_messages.send(value=value)
-
-
 def message_consumer():
     pass
     # conf = {

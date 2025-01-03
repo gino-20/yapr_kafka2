@@ -51,6 +51,9 @@ filtered_messages = app.topic(RECEIVER_TOPIC, value_type=bytes)
 @app.agent(incoming_messages)
 async def process(stream):  # Filtering out messages, containing filtered words
     async for value in stream:
-        if filtered_words.intersection(value.decode("utf-8").split(' ')):
+        try:
+            if filtered_words.intersection(value.decode("utf-8").split(', ')[1].split(' ')):
+                continue
+        except ValueError as e:
             continue
         await filtered_messages.send(value=value)
